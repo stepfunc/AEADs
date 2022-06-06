@@ -35,7 +35,7 @@
 //! [aead]: https://docs.rs/aead
 //! [1]: https://en.wikipedia.org/wiki/Authenticated_encryption
 
-#![no_std]
+//#![no_std]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo.svg",
     html_favicon_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo.svg"
@@ -349,6 +349,69 @@ fn fill_aad_header(adata_len: usize) -> (usize, GenericArray<u8, U16>) {
 
 #[cfg(test)]
 mod tests {
+
+    use crate::GenericArray;
+    use aead::{AeadInPlace, NewAead};
+
+    const KEYS: [[u8; 16]; 2] = [
+        [0x00; 16],
+        [
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+            0x0E, 0x0F,
+        ],
+    ];
+
+    const NONCES: [[u8; 12]; 3] = [
+        [0x00; 12],
+        [0xFF; 12],
+        [
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+        ],
+    ];
+
+    fn plaintext() -> Vec<Vec<u8>> {
+        let mut ret = Vec::new();
+        ret.push(vec![]);
+        ret.push(vec![0x01, 0x02, 0x03]);
+        ret
+    }
+
+    fn ad() -> Vec<Vec<u8>> {
+        let mut ret = Vec::new();
+        ret.push(vec![]);
+        ret.push(vec![0x0B, 0x0C, 0x0D]);
+        ret
+    }
+
+    type Cipher = crate::Ccm<aes::Aes128, crate::consts::U16, crate::consts::U12>;
+
+    #[test]
+    fn generate_test_vectors() {
+        for key in KEYS.iter() {
+            for nonce in NONCES.iter() {
+                for ad in ad() {
+                    for mut pt in plaintext() {
+                        println!("KEY = {}", hex::encode(key));
+                        println!("NONCE = {}", hex::encode(nonce));
+                        println!("IN = {}", hex::encode(pt.as_slice()));
+                        println!("AD = {}", hex::encode(ad.as_slice()));
+
+                        let key = GenericArray::from_slice(key);
+                        let nonce = GenericArray::from_slice(nonce);
+                        let cipher = Cipher::new(key);
+                        let tag = cipher
+                            .encrypt_in_place_detached(nonce, &ad, pt.as_mut_slice())
+                            .unwrap();
+
+                        println!("CT = {}", hex::encode(pt.as_slice()));
+                        println!("TAG = {}", hex::encode(tag.as_slice()));
+                        println!();
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn fill_aad_header_test() {
         use super::fill_aad_header;

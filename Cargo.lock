@@ -102,6 +102,7 @@ dependencies = [
  "aes 0.7.5",
  "cipher 0.3.0",
  "ctr 0.8.0",
+ "hex",
  "hex-literal 0.2.2",
  "subtle",
 ]
@@ -294,6 +295,12 @@ dependencies = [
  "spin",
  "stable_deref_trait",
 ]
+
+[[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hex-literal"
