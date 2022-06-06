@@ -352,36 +352,74 @@ mod tests {
 
     use crate::GenericArray;
     use aead::{AeadInPlace, NewAead};
+    use aes::BLOCK_SIZE;
+    use rand::RngCore;
+    use rand::rngs::ThreadRng;
 
-    const KEYS: [[u8; 16]; 2] = [
-        [0x00; 16],
-        [
-            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
-            0x0E, 0x0F,
-        ],
-    ];
-
-    const NONCES: [[u8; 12]; 3] = [
-        [0x00; 12],
-        [0xFF; 12],
-        [
-            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
-        ],
-    ];
-
-    fn plaintext() -> Vec<Vec<u8>> {
-        let mut ret = Vec::new();
-        ret.push(vec![]);
-        ret.push(vec![0x01, 0x02, 0x03]);
-        ret
+    enum KeyType {
+        Fixed([u8; 16]),
+        Random,
     }
 
-    fn ad() -> Vec<Vec<u8>> {
-        let mut ret = Vec::new();
-        ret.push(vec![]);
-        ret.push(vec![0x0B, 0x0C, 0x0D]);
-        ret
+    enum NonceType {
+        Fixed([u8; 12]),
+        Random,
     }
+
+    impl KeyType {
+        fn get(&self, rng: &mut rand::rngs::ThreadRng) -> [u8; 16] {
+            match self {
+                KeyType::Fixed(x) => x.clone(),
+                KeyType::Random => {
+                    let mut ret: [u8; 16] = Default::default();
+                    rng.fill_bytes(&mut ret);
+                    ret
+                }
+            }
+        }
+    }
+
+    impl NonceType {
+        fn get(&self, rng: &mut rand::rngs::ThreadRng) -> [u8; 12] {
+            match self {
+                NonceType::Fixed(x) => x.clone(),
+                NonceType::Random => {
+                    let mut ret: [u8; 12] = Default::default();
+                    rng.fill_bytes(&mut ret);
+                    ret
+                }
+            }
+        }
+    }
+
+    const KEYS: [KeyType; 2] = [
+        KeyType::Fixed([0x00; 16]),
+        KeyType::Random
+    ];
+
+    const NONCES: [NonceType; 3] = [
+        NonceType::Fixed([0x00; 12]),
+        NonceType::Fixed([0xFF; 12]),
+        NonceType::Random,
+    ];
+
+    const AD_LENGTHS: [usize; 4] = [
+        0,
+        1,
+        // what can fit in the first block with the tag/length
+        BLOCK_SIZE-2,
+        // 1 more than what fits in the first B0
+        BLOCK_SIZE-1,
+    ];
+
+    const PT_LENGTHS: [usize; 5] = [
+        0,
+        1,
+        // boundary conditions around a block
+        BLOCK_SIZE-1,
+        BLOCK_SIZE,
+        BLOCK_SIZE+1
+    ];
 
     type Cipher = crate::Ccm<aes::Aes128, crate::consts::U16, crate::consts::U12>;
 
@@ -394,19 +432,32 @@ mod tests {
         }
     }
 
+    fn get_bytes(rng: &mut ThreadRng, len: usize) -> Vec<u8> {
+        let mut vec = Vec::with_capacity(len);
+        vec.resize(len, 0);
+        rng.fill_bytes(vec.as_mut_slice());
+        vec
+    }
+
     #[test]
     fn generate_test_vectors() {
+        let mut rng = rand::thread_rng();
+
         for key in KEYS.iter() {
             for nonce in NONCES.iter() {
-                for ad in ad() {
-                    for mut pt in plaintext() {
-                        println!("KEY = {}", to_hex(key));
-                        println!("NONCE = {}", to_hex(nonce));
+                for ad_len in AD_LENGTHS {
+                    for pt_len in PT_LENGTHS {
+                        let key = key.get(&mut rng);
+                        let nonce = nonce.get(&mut rng);
+                        let ad = get_bytes(&mut rng, ad_len);
+                        let mut pt = get_bytes(&mut rng, pt_len);
+                        println!("KEY = {}", to_hex(&key));
+                        println!("NONCE = {}", to_hex(&nonce));
                         println!("IN = {}", to_hex(pt.as_slice()));
                         println!("AD = {}", to_hex(ad.as_slice()));
 
-                        let key = GenericArray::from_slice(key);
-                        let nonce = GenericArray::from_slice(nonce);
+                        let key = GenericArray::from_slice(&key);
+                        let nonce = GenericArray::from_slice(&nonce);
                         let cipher = Cipher::new(key);
                         let tag = cipher
                             .encrypt_in_place_detached(nonce, &ad, pt.as_mut_slice())
