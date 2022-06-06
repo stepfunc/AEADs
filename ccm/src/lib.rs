@@ -385,16 +385,25 @@ mod tests {
 
     type Cipher = crate::Ccm<aes::Aes128, crate::consts::U16, crate::consts::U12>;
 
+    fn to_hex<T: AsRef<[u8]>>(data: T) -> String {
+        let hex = hex::encode(data);
+        if hex.is_empty() {
+            "\"\"".to_string()
+        } else {
+            hex
+        }
+    }
+
     #[test]
     fn generate_test_vectors() {
         for key in KEYS.iter() {
             for nonce in NONCES.iter() {
                 for ad in ad() {
                     for mut pt in plaintext() {
-                        println!("KEY = {}", hex::encode(key));
-                        println!("NONCE = {}", hex::encode(nonce));
-                        println!("IN = {}", hex::encode(pt.as_slice()));
-                        println!("AD = {}", hex::encode(ad.as_slice()));
+                        println!("KEY = {}", to_hex(key));
+                        println!("NONCE = {}", to_hex(nonce));
+                        println!("IN = {}", to_hex(pt.as_slice()));
+                        println!("AD = {}", to_hex(ad.as_slice()));
 
                         let key = GenericArray::from_slice(key);
                         let nonce = GenericArray::from_slice(nonce);
@@ -403,8 +412,8 @@ mod tests {
                             .encrypt_in_place_detached(nonce, &ad, pt.as_mut_slice())
                             .unwrap();
 
-                        println!("CT = {}", hex::encode(pt.as_slice()));
-                        println!("TAG = {}", hex::encode(tag.as_slice()));
+                        println!("CT = {}", to_hex(pt.as_slice()));
+                        println!("TAG = {}", to_hex(tag.as_slice()));
                         println!();
                     }
                 }
